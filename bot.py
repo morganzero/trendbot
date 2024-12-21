@@ -4,6 +4,8 @@ import tmdbsimple as tmdb
 import json
 import os
 import requests
+from gql import gql, Client
+from gql.transport.requests import RequestsHTTPTransport
 from datetime import datetime
 
 # Load configuration from config.json or environment variables
@@ -28,15 +30,15 @@ TRAKT_API_KEY = config["TRAKT_API_KEY"]
 CHANNEL_ID = config["CHANNEL_ID"]
 POST_TIME = config["POST_TIME"]
 
-# Configure TMDb API
+# Configure APIs
 tmdb.API_KEY = TMDB_API_KEY
-
-# Configure Trakt API headers
 trakt_headers = {
     "Content-Type": "application/json",
     "trakt-api-version": "2",
     "trakt-api-key": TRAKT_API_KEY
 }
+anilist_transport = RequestsHTTPTransport(url="https://graphql.anilist.co", use_json=True)
+anilist_client = Client(transport=anilist_transport, fetch_schema_from_transport=True)
 
 # Bot setup
 intents = discord.Intents.default()
@@ -57,80 +59,77 @@ def fetch_tmdb_trending_shows():
     trending = tmdb.Trending('tv', 'week')
     return trending.info().get('results', [])
 
-# Fetch trending movies from Trakt
-def fetch_trakt_trending_movies():
-    response = requests.get("https://api.trakt.tv/movies/trending", headers=trakt_headers)
-    return response.json() if response.status_code == 200 else []
+# Fetch current anime season from AniList
+def fetch_anilist_current_season():
+    query = gql("""
+    query {
+        Page(page: 1, perPage: 10) {
+            media(season: WINTER, seasonYear: 2024, type: ANIME, format_in: [TV]) {
+                title {
+                    romaji
+                }
+                description
+                averageScore
+                coverImage {
+                    large
+                }
+            }
+        }
+    }
+    """)
+    result = anilist_client.execute(query)
+    return result["Page"]["media"]
 
-# Fetch trending TV shows from Trakt
-def fetch_trakt_trending_shows():
-    response = requests.get("https://api.trakt.tv/shows/trending", headers=trakt_headers)
-    return response.json() if response.status_code == 200 else []
+# Create an embed field for content
+def create_embed_field(item, media_type):
+    if media_type == "movie":
+        title = item.get("title")
+        trailer = f"https://www.youtube.com/results?search_query={title}+trailer" if title else "No trailer available"
+        return f"**{title}**\nRating: {item.get('vote_average', 'N/A')} ({item.get('vote_count', 'N/A')} votes)\n[Trailer]({trailer})"
+    elif media_type == "tv":
+        return f"**{item.get('name')}**\nRating: {item.get('vote_average', 'N/A')} ({item.get('vote_count', 'N/A')} votes)"
+    elif media_type == "anime":
+        return f"**{item['title']['romaji']}**\nScore: {item.get('averageScore', 'N/A')}/100"
 
-# Create an embed for content
-def create_embed(item, media_type):
-    title = item.get("title") or item.get("name")
-    description = item.get("overview", "No description available.")
-    rating = f"{item.get('vote_average', 'N/A')} ({item.get('vote_count', 'N/A')} votes)"
-    poster_url = f"https://image.tmdb.org/t/p/w500{item.get('poster_path')}" if item.get("poster_path") else None
-
-    embed = discord.Embed(
-        title=title,
-        description=description,
-        color=discord.Color.blue()
-    )
-    embed.add_field(name="Rating", value=rating, inline=False)
-    if poster_url:
-        embed.set_image(url=poster_url)
-    return embed
-
-# Slash command: Ping-Pong Test
-@bot.tree.command(name="ping", description="Test if the bot is responsive.")
-async def ping_command(interaction: discord.Interaction):
-    await interaction.response.send_message("Pong!")
-
-# Slash command: Fetch trending movies
-@bot.tree.command(name="trending_movies", description="Fetches the top trending movies.")
-async def trending_movies_command(interaction: discord.Interaction):
-    tmdb_movies = fetch_tmdb_trending_movies()[:5]
-    trakt_movies = fetch_trakt_trending_movies()[:5]
-    await interaction.response.send_message("🎥 **Trending Movies:**")
-    for movie in tmdb_movies + trakt_movies:
-        embed = create_embed(movie, "movie")
-        await interaction.followup.send(embed=embed)
-
-# Slash command: Fetch trending TV shows
-@bot.tree.command(name="trending_shows", description="Fetches the top trending TV shows.")
-async def trending_shows_command(interaction: discord.Interaction):
-    tmdb_shows = fetch_tmdb_trending_shows()[:5]
-    trakt_shows = fetch_trakt_trending_shows()[:5]
-    await interaction.response.send_message("📺 **Trending TV Shows:**")
-    for show in tmdb_shows + trakt_shows:
-        embed = create_embed(show, "tv")
-        await interaction.followup.send(embed=embed)
-
-# Post trending content
+# Post trending content in a single message
 async def post_trending_content():
     channel = bot.get_channel(CHANNEL_ID)
     if channel is None:
         print(f"Channel with ID {CHANNEL_ID} not found!")
         return
 
-    # Post movies
     tmdb_movies = fetch_tmdb_trending_movies()[:5]
-    trakt_movies = fetch_trakt_trending_movies()[:5]
-    await channel.send("🎥 **Trending Movies**:")
-    for movie in tmdb_movies + trakt_movies:
-        embed = create_embed(movie, "movie")
-        await channel.send(embed=embed)
-
-    # Post TV shows
     tmdb_shows = fetch_tmdb_trending_shows()[:5]
-    trakt_shows = fetch_trakt_trending_shows()[:5]
-    await channel.send("📺 **Trending TV Shows**:")
-    for show in tmdb_shows + trakt_shows:
-        embed = create_embed(show, "tv")
-        await channel.send(embed=embed)
+    anilist_anime = fetch_anilist_current_season()
+
+    embed = discord.Embed(
+        title="🎥📺🍥 Trending Content This Week",
+        description="Here are the top movies, TV shows, and anime for this week!",
+        color=discord.Color.blue()
+    )
+
+    # Add movies
+    movie_fields = [create_embed_field(movie, "movie") for movie in tmdb_movies]
+    embed.add_field(name="🎥 Trending Movies", value="\n\n".join(movie_fields), inline=False)
+
+    # Add TV shows
+    tv_fields = [create_embed_field(show, "tv") for show in tmdb_shows]
+    embed.add_field(name="📺 Trending TV Shows", value="\n\n".join(tv_fields), inline=False)
+
+    # Add anime
+    anime_fields = [create_embed_field(anime, "anime") for anime in anilist_anime]
+    embed.add_field(name="🍥 Current Anime Season", value="\n\n".join(anime_fields), inline=False)
+
+    # Add thumbnail
+    embed.set_thumbnail(url="https://image.tmdb.org/t/p/w200" + tmdb_movies[0].get("poster_path", ""))
+
+    await channel.send(embed=embed)
+
+# Slash command to post trending content
+@bot.tree.command(name="post_trending", description="Manually post trending content.")
+async def post_trending_command(interaction: discord.Interaction):
+    await post_trending_content()
+    await interaction.response.send_message("Trending content posted!", ephemeral=True)
 
 # Scheduled task for posting
 @tasks.loop(minutes=1)
