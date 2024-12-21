@@ -1,12 +1,12 @@
 Run the bot:
 ```
 docker run -d \
-  --name discord-trending-bot \
+  --name trendbot \
   -e DISCORD_BOT_TOKEN=your_discord_token_here \
   -e TMDB_API_KEY=your_tmdb_api_key_here \
   -e TRAKT_API_KEY=your_trakt_api_key_here \
   -e POST_TIME=12:00 \
-  discord-trending-bot-image
+  sushibox/trendbot
 
 ```
 Steps to Invite the Bot
