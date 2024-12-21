@@ -44,6 +44,9 @@ intents.messages = True
 intents.guilds = True
 bot = discord.Client(intents=intents)
 
+# Command Tree for slash commands
+bot.tree = discord.app_commands.CommandTree(bot)
+
 # Fetch trending movies from TMDb
 def fetch_tmdb_trending_movies():
     trending = tmdb.Trending('movie', 'week')
@@ -81,6 +84,31 @@ def create_embed(item, media_type):
         embed.set_image(url=poster_url)
     return embed
 
+# Slash command: Ping-Pong Test
+@bot.tree.command(name="ping", description="Test if the bot is responsive.")
+async def ping_command(interaction: discord.Interaction):
+    await interaction.response.send_message("Pong!")
+
+# Slash command: Fetch trending movies
+@bot.tree.command(name="trending_movies", description="Fetches the top trending movies.")
+async def trending_movies_command(interaction: discord.Interaction):
+    tmdb_movies = fetch_tmdb_trending_movies()[:5]
+    trakt_movies = fetch_trakt_trending_movies()[:5]
+    await interaction.response.send_message("🎥 **Trending Movies:**")
+    for movie in tmdb_movies + trakt_movies:
+        embed = create_embed(movie, "movie")
+        await interaction.followup.send(embed=embed)
+
+# Slash command: Fetch trending TV shows
+@bot.tree.command(name="trending_shows", description="Fetches the top trending TV shows.")
+async def trending_shows_command(interaction: discord.Interaction):
+    tmdb_shows = fetch_tmdb_trending_shows()[:5]
+    trakt_shows = fetch_trakt_trending_shows()[:5]
+    await interaction.response.send_message("📺 **Trending TV Shows:**")
+    for show in tmdb_shows + trakt_shows:
+        embed = create_embed(show, "tv")
+        await interaction.followup.send(embed=embed)
+
 # Post trending content
 async def post_trending_content():
     channel = bot.get_channel(CHANNEL_ID)
@@ -111,9 +139,15 @@ async def scheduled_post():
     if now == POST_TIME:
         await post_trending_content()
 
+# Sync slash commands on bot startup
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user.name}")
+    try:
+        await bot.tree.sync()
+        print("Slash commands synced successfully!")
+    except Exception as e:
+        print(f"Error syncing slash commands: {e}")
     scheduled_post.start()
 
 # Run the bot
