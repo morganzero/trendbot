@@ -202,7 +202,6 @@ async def send_batched_embeds(channel, embeds, title):
         await channel.send(f"**{title}**", embeds=embeds[i:i + batch_size])
 
 
-# Post trending content in multiple embeds
 async def post_trending_content():
     if not CHANNEL_ID:
         print("CHANNEL_ID is not set or invalid.")
@@ -214,24 +213,105 @@ async def post_trending_content():
         return
 
     try:
+        # Fetch trending data
         tmdb_movies = fetch_tmdb_trending_movies()
         tmdb_shows = fetch_tmdb_trending_shows()
         anilist_anime = fetch_anilist_current_season()
 
-        # Movies
-        movie_embeds = [create_embed(movie, "movie") for movie in tmdb_movies]
+        # Generate embeds
+        movie_embeds = [format_movie_embed(movie) for movie in tmdb_movies]
+        tv_embeds = [format_tv_embed(show) for show in tmdb_shows]
+        anime_embeds = [format_anime_embed(anime) for anime in anilist_anime]
+
+        # Send each category
         await send_batched_embeds(channel, movie_embeds, "🎥 Trending Movies")
-
-        # TV Shows
-        tv_embeds = [create_embed(show, "tv") for show in tmdb_shows]
         await send_batched_embeds(channel, tv_embeds, "📺 Trending TV Shows")
-
-        # Anime
-        anime_embeds = [create_embed(anime, "anime") for anime in anilist_anime]
         await send_batched_embeds(channel, anime_embeds, "🍥 Current Anime Season")
 
     except Exception as e:
         print(f"Error posting trending content: {e}")
+
+
+# Helper to format movie embeds
+def format_movie_embed(movie):
+    details = fetch_tmdb_movie_details(movie["id"])
+    title = details.get("title", "Unknown Title")
+    rating = f"{details.get('vote_average', 0):.1f}/10 ({details.get('vote_count', 0)} votes)"
+    watchers = fetch_trakt_watching(generate_slug(title), "movies")
+    tagline = details.get("tagline", "No tagline available.")
+    genres = ", ".join([genre["name"] for genre in details.get("genres", [])[:2]])
+    runtime = f"{details.get('runtime', 'N/A')} minutes"
+    release_date = details.get("release_date", "N/A")
+    trakt_link = f"https://trakt.tv/movies/{generate_slug(title)}"
+    poster_url = f"https://image.tmdb.org/t/p/w200{details.get('poster_path', '')}"
+
+    embed = discord.Embed(
+        title=title,
+        description=f"⭐ **{rating}**\n"
+                    f"👀 **{watchers}** people currently watching\n\n"
+                    f"📜 **Tagline**: {tagline}\n"
+                    f"🎭 **Genres**: {genres}\n"
+                    f"🕒 **Runtime**: {runtime}\n"
+                    f"🎥 **Release Date**: {release_date}\n\n"
+                    f"🔗 [More Info on Trakt]({trakt_link})",
+        color=discord.Color.blue()
+    )
+    embed.set_thumbnail(url=poster_url)
+    return embed
+
+
+# Helper to format TV show embeds
+def format_tv_embed(show):
+    details = fetch_tmdb_show_details(show["id"])
+    title = details.get("name", "Unknown Title")
+    rating = f"{details.get('vote_average', 0):.1f}/10 ({details.get('vote_count', 0)} votes)"
+    watchers = fetch_trakt_watching(generate_slug(title), "shows")
+    tagline = details.get("tagline", "No tagline available.")
+    genres = ", ".join([genre["name"] for genre in details.get("genres", [])[:2]])
+    episode_length = f"{details.get('episode_run_time', ['N/A'])[0]} minutes"
+    status = details.get("status", "N/A")
+    trakt_link = f"https://trakt.tv/shows/{generate_slug(title)}"
+    poster_url = f"https://image.tmdb.org/t/p/w200{details.get('poster_path', '')}"
+
+    embed = discord.Embed(
+        title=title,
+        description=f"⭐ **{rating}**\n"
+                    f"👀 **{watchers}** people currently watching\n\n"
+                    f"📜 **Tagline**: {tagline}\n"
+                    f"🎭 **Genres**: {genres}\n"
+                    f"🕒 **Episode Length**: {episode_length}\n"
+                    f"📅 **Status**: {status}\n\n"
+                    f"🔗 [More Info on Trakt]({trakt_link})",
+        color=discord.Color.green()
+    )
+    embed.set_thumbnail(url=poster_url)
+    return embed
+
+
+# Helper to format anime embeds
+def format_anime_embed(anime):
+    title = anime["title"]["romaji"]
+    score = anime.get("averageScore", "N/A")
+    watchers = fetch_trakt_watching(title.replace(" ", "-").lower(), "shows")
+    genres = ", ".join(anime.get("genres", [])[:2])
+    episodes = anime.get("episodes", "N/A")
+    status = "Airing" if anime.get("status", "").lower() == "releasing" else "Completed"
+    trakt_link = f"https://trakt.tv/search?query={quote(title)}"
+    poster_url = anime["coverImage"]["large"]
+
+    embed = discord.Embed(
+        title=title,
+        description=f"⭐ **{score}/100**\n"
+                    f"👀 **{watchers}** people currently watching\n\n"
+                    f"🎭 **Genres**: {genres}\n"
+                    f"📺 **Episodes**: {episodes}\n"
+                    f"📅 **Status**: {status}\n\n"
+                    f"🔗 [More Info on Trakt]({trakt_link})",
+        color=discord.Color.orange()
+    )
+    embed.set_thumbnail(url=poster_url)
+    return embed
+
 
 # Slash command to post trending content
 @bot.tree.command(name="post_trending", description="Manually post trending content.")
