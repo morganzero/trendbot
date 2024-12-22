@@ -98,11 +98,15 @@ def fetch_trakt_watching(slug, media_type):
         print(f"Error fetching Trakt watching data for {slug}: {e}")
         return 0
 
+# Generate slug for Trakt
+def generate_slug(title):
+    return title.lower().replace(" ", "-").replace(":", "").replace(",", "")
+
 # Create an embed for an item
 def create_embed(item, media_type):
     if media_type == "movie":
         title = item.get("title")
-        slug = title.lower().replace(" ", "-") if title else "unknown"
+        slug = generate_slug(title) if title else "unknown"
         watching = fetch_trakt_watching(slug, "movies")
         trailer = f"https://www.youtube.com/results?search_query={quote(title)}+trailer" if title else "No trailer available"
         rating = item.get("vote_average", "N/A")
@@ -117,7 +121,7 @@ def create_embed(item, media_type):
         return embed
     elif media_type == "tv":
         title = item.get("name")
-        slug = title.lower().replace(" ", "-") if title else "unknown"
+        slug = generate_slug(title) if title else "unknown"
         watching = fetch_trakt_watching(slug, "shows")
         rating = item.get("vote_average", "N/A")
         votes = item.get("vote_count", "N/A")
