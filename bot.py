@@ -202,6 +202,7 @@ async def send_batched_embeds(channel, embeds, title):
         await channel.send(f"**{title}**", embeds=embeds[i:i + batch_size])
 
 async def post_trending_content():
+    """Fetch and post trending content with an appealing, emoji-enhanced format."""
     if not CHANNEL_ID:
         print("CHANNEL_ID is not set or invalid.")
         return
@@ -225,38 +226,33 @@ async def post_trending_content():
         anilist_anime = fetch_anilist_current_season()
         print(f"Fetched {len(anilist_anime)} anime titles.")
 
-        # Generate embeds
-        print("Generating embeds for movies...")
-        movie_embeds = [format_movie_embed(movie) for movie in tmdb_movies]
+        # Generate and post embeds
+        if tmdb_movies:
+            print(f"Posting {len(tmdb_movies)} movie embeds...")
+            await channel.send("🎥 **Trending Movies**")
+            for movie in tmdb_movies:
+                embed = format_movie_embed(movie)
+                if embed:
+                    await channel.send(embed=embed)
 
-        print("Generating embeds for TV shows...")
-        tv_embeds = [format_tv_embed(show) for show in tmdb_shows]
+        if tmdb_shows:
+            print(f"Posting {len(tmdb_shows)} TV show embeds...")
+            await channel.send("📺 **Trending TV Shows**")
+            for show in tmdb_shows:
+                embed = format_tv_embed(show)
+                if embed:
+                    await channel.send(embed=embed)
 
-        print("Generating embeds for anime...")
-        anime_embeds = [format_anime_embed(anime) for anime in anilist_anime]
-
-        # Send each category
-        if movie_embeds:
-            print(f"Posting {len(movie_embeds)} movie embeds...")
-            await send_batched_embeds(channel, movie_embeds, "🎥 Trending Movies")
-        else:
-            print("No movie embeds to post.")
-
-        if tv_embeds:
-            print(f"Posting {len(tv_embeds)} TV show embeds...")
-            await send_batched_embeds(channel, tv_embeds, "📺 Trending TV Shows")
-        else:
-            print("No TV show embeds to post.")
-
-        if anime_embeds:
-            print(f"Posting {len(anime_embeds)} anime embeds...")
-            await send_batched_embeds(channel, anime_embeds, "🍥 Current Anime Season")
-        else:
-            print("No anime embeds to post.")
+        if anilist_anime:
+            print(f"Posting {len(anilist_anime)} anime embeds...")
+            await channel.send("🍥 **Current Anime Season**")
+            for anime in anilist_anime:
+                embed = format_anime_embed(anime)
+                if embed:
+                    await channel.send(embed=embed)
 
     except Exception as e:
         print(f"Error posting trending content: {e}")
-
 
 # Helper to format movie embeds
 def format_movie_embed(movie):
@@ -276,10 +272,10 @@ def format_movie_embed(movie):
             title=title,
             description=f"⭐ **{rating}**\n"
                         f"👀 **{watchers}** people currently watching\n\n"
-                        f"📜 **Tagline**: {tagline}\n"
                         f"🎭 **Genres**: {genres}\n"
                         f"🕒 **Runtime**: {runtime}\n"
                         f"🎥 **Release Date**: {release_date}\n\n"
+                        f"📜 **Tagline**: {tagline}\n"
                         f"🔗 [More Info on Trakt]({trakt_link})",
             color=discord.Color.blue()
         )
@@ -308,10 +304,10 @@ def format_tv_embed(show):
             title=title,
             description=f"⭐ **{rating}**\n"
                         f"👀 **{watchers}** people currently watching\n\n"
-                        f"📜 **Tagline**: {tagline}\n"
                         f"🎭 **Genres**: {genres}\n"
                         f"🕒 **Episode Length**: {episode_length}\n"
                         f"📅 **Status**: {status}\n\n"
+                        f"📜 **Tagline**: {tagline}\n"
                         f"🔗 [More Info on Trakt]({trakt_link})",
             color=discord.Color.green()
         )
