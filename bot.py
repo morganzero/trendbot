@@ -138,22 +138,25 @@ async def post_trending_content():
         anilist_anime = fetch_anilist_current_season()
 
         # Post movies
-        await channel.send("🎥 **Trending Movies**")
+        movie_embeds = []
         for movie in tmdb_movies:
             embed = create_embed(movie, "movie")
-            await channel.send(embed=embed)
+            movie_embeds.append(embed)
+        await channel.send("🎥 **Trending Movies**", embeds=movie_embeds)
 
         # Post TV shows
-        await channel.send("📺 **Trending TV Shows**")
+        tv_embeds = []
         for show in tmdb_shows:
             embed = create_embed(show, "tv")
-            await channel.send(embed=embed)
+            tv_embeds.append(embed)
+        await channel.send("📺 **Trending TV Shows**", embeds=tv_embeds)
 
         # Post anime
-        await channel.send("🍥 **Current Anime Season**")
+        anime_embeds = []
         for anime in anilist_anime:
             embed = create_embed(anime, "anime")
-            await channel.send(embed=embed)
+            anime_embeds.append(embed)
+        await channel.send("🍥 **Current Anime Season**", embeds=anime_embeds)
 
     except Exception as e:
         print(f"Error posting trending content: {e}")
@@ -161,11 +164,12 @@ async def post_trending_content():
 # Slash command to post trending content
 @bot.tree.command(name="post_trending", description="Manually post trending content.")
 async def post_trending_command(interaction: discord.Interaction):
+    await interaction.response.defer()  # Acknowledge the interaction immediately
     try:
         await post_trending_content()
-        await interaction.response.send_message("Trending content posted!", ephemeral=True)
+        await interaction.followup.send("Trending content posted!")
     except Exception as e:
-        await interaction.response.send_message(f"Failed to post content: {e}", ephemeral=True)
+        await interaction.followup.send(f"Failed to post content: {e}")
 
 # Scheduled task for posting
 @tasks.loop(minutes=1)
