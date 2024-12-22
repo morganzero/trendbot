@@ -68,9 +68,9 @@ def fetch_anilist_current_season():
                     title {
                         romaji
                     }
-                    description
                     averageScore
                     popularity
+                    status
                     coverImage {
                         large
                     }
@@ -84,180 +84,10 @@ def fetch_anilist_current_season():
         print(f"Error fetching AniList data: {e}")
         return []
 
-# Fetch users currently watching from Trakt
-def fetch_trakt_watching(slug, media_type):
-    try:
-        url = f"https://api.trakt.tv/{media_type}/{slug}/watching"
-        response = requests.get(url, headers=trakt_headers)
-        if response.status_code == 200:
-            watching_data = response.json()
-            return len(watching_data)  # Count of users watching
-        else:
-            print(f"Failed to fetch Trakt watching data for {slug}: {response.status_code}")
-            return 0
-    except Exception as e:
-        print(f"Error fetching Trakt watching data for {slug}: {e}")
-        return 0
-
-# Generate slug for Trakt
-def generate_slug(title):
-    return title.lower().replace(" ", "-").replace(":", "").replace(",", "")
-
-def fetch_tmdb_movie_details(movie_id):
-    """Fetch detailed movie info including runtime, genres, and tagline."""
-    details = tmdb.Movies(movie_id)
-    return details.info()
-
-
-def fetch_tmdb_show_details(show_id):
-    """Fetch detailed TV show info including genres, episode runtime, and seasons."""
-    details = tmdb.TV(show_id)
-    return details.info()
-
-
-def create_embed(item, media_type):
-    trakt_base_url = "https://trakt.tv"
-
-    if media_type == "movie":
-        # Fetch detailed information for the movie
-        details = fetch_tmdb_movie_details(item["id"])
-        title = details.get("title", "Unknown Title")
-        release_date = details.get("release_date", "N/A")
-        runtime = details.get("runtime", "N/A")
-        genres = ", ".join([genre["name"] for genre in details.get("genres", [])[:2]])
-        tagline = details.get("tagline", "No tagline available.")
-        slug = generate_slug(title)
-        watchers = fetch_trakt_watching(slug, "movies")
-        trakt_link = f"{trakt_base_url}/movies/{slug}"
-        poster_url = f"https://image.tmdb.org/t/p/w200{details.get('poster_path', '')}"
-
-        embed = discord.Embed(
-            title=title,
-            description=f"⭐ **{details.get('vote_average', 0):.1f}/10** ({details.get('vote_count', 0)} votes)\n"
-                        f"🎥 **Release Date**: {release_date}\n"
-                        f"🕒 **Runtime**: {runtime} minutes\n"
-                        f"🎭 **Genres**: {genres}\n"
-                        f"👀 **{watchers}** people currently watching\n"
-                        f"📜 **Tagline**: {tagline}\n"
-                        f"🔗 [More Info on Trakt]({trakt_link})",
-            color=discord.Color.blue()
-        )
-        embed.set_thumbnail(url=poster_url)
-        return embed
-
-    elif media_type == "tv":
-        # Fetch detailed information for the TV show
-        details = fetch_tmdb_show_details(item["id"])
-        title = details.get("name", "Unknown Title")
-        genres = ", ".join([genre["name"] for genre in details.get("genres", [])[:2]])
-        episode_length = details.get("episode_run_time", ["N/A"])[0]
-        status = details.get("status", "N/A")
-        seasons = details.get("number_of_seasons", "N/A")
-        slug = generate_slug(title)
-        watchers = fetch_trakt_watching(slug, "shows")
-        trakt_link = f"{trakt_base_url}/shows/{slug}"
-        poster_url = f"https://image.tmdb.org/t/p/w200{details.get('poster_path', '')}"
-
-        embed = discord.Embed(
-            title=title,
-            description=f"⭐ **{details.get('vote_average', 0):.1f}/10** ({details.get('vote_count', 0)} votes)\n"
-                        f"🎭 **Genres**: {genres}\n"
-                        f"🕒 **Episode Length**: {episode_length} minutes\n"
-                        f"📅 **Status**: {status}\n"
-                        f"📺 **Seasons**: {seasons}\n"
-                        f"👀 **{watchers}** people currently watching\n"
-                        f"🔗 [More Info on Trakt]({trakt_link})",
-            color=discord.Color.green()
-        )
-        embed.set_thumbnail(url=poster_url)
-        return embed
-
-    elif media_type == "anime":
-        title = item["title"]["romaji"]
-        score = item.get("averageScore", "N/A")
-        episodes = item.get("episodes", "N/A")
-        status = "Airing" if item.get("status", "N/A").lower() == "releasing" else "Completed"
-        genres = ", ".join(item.get("genres", [])[:2])
-        popularity = item.get("popularity", "N/A")
-        trakt_link = f"{trakt_base_url}/search?query={quote(title)}"
-        poster_url = item["coverImage"]["large"]
-
-        embed = discord.Embed(
-            title=title,
-            description=f"⭐ **Score**: {score}/100\n"
-                        f"📺 **Episodes**: {episodes}\n"
-                        f"📅 **Status**: {status}\n"
-                        f"🎭 **Genres**: {genres}\n"
-                        f"👥 **Popularity**: {popularity}\n"
-                        f"🔗 [More Info on Trakt]({trakt_link})",
-            color=discord.Color.orange()
-        )
-        embed.set_thumbnail(url=poster_url)
-        return embed
-
-
-async def send_batched_embeds(channel, embeds, title):
-    batch_size = 10
-    for i in range(0, len(embeds), batch_size):
-        await channel.send(f"**{title}**", embeds=embeds[i:i + batch_size])
-
-async def post_trending_content():
-    """Fetch and post trending content with an appealing, emoji-enhanced format."""
-    if not CHANNEL_ID:
-        print("CHANNEL_ID is not set or invalid.")
-        return
-
-    channel = bot.get_channel(CHANNEL_ID)
-    if channel is None:
-        print(f"Channel with ID {CHANNEL_ID} not found!")
-        return
-
-    try:
-        # Fetch trending data
-        print("Fetching trending movies...")
-        tmdb_movies = fetch_tmdb_trending_movies()
-        print(f"Fetched {len(tmdb_movies)} movies.")
-
-        print("Fetching trending TV shows...")
-        tmdb_shows = fetch_tmdb_trending_shows()
-        print(f"Fetched {len(tmdb_shows)} TV shows.")
-
-        print("Fetching current anime season...")
-        anilist_anime = fetch_anilist_current_season()
-        print(f"Fetched {len(anilist_anime)} anime titles.")
-
-        # Generate and post embeds
-        if tmdb_movies:
-            print(f"Posting {len(tmdb_movies)} movie embeds...")
-            await channel.send("🎥 **Trending Movies**")
-            for movie in tmdb_movies:
-                embed = format_movie_embed(movie)
-                if embed:
-                    await channel.send(embed=embed)
-
-        if tmdb_shows:
-            print(f"Posting {len(tmdb_shows)} TV show embeds...")
-            await channel.send("📺 **Trending TV Shows**")
-            for show in tmdb_shows:
-                embed = format_tv_embed(show)
-                if embed:
-                    await channel.send(embed=embed)
-
-        if anilist_anime:
-            print(f"Posting {len(anilist_anime)} anime embeds...")
-            await channel.send("🍥 **Current Anime Season**")
-            for anime in anilist_anime:
-                embed = format_anime_embed(anime)
-                if embed:
-                    await channel.send(embed=embed)
-
-    except Exception as e:
-        print(f"Error posting trending content: {e}")
-
 # Helper to format movie embeds
 def format_movie_embed(movie):
     try:
-        details = fetch_tmdb_movie_details(movie["id"])
+        details = tmdb.Movies(movie["id"]).info()
         title = details.get("title", "Unknown Title")
         rating = f"{details.get('vote_average', 0):.1f}/10 ({details.get('vote_count', 0)} votes)"
         watchers = fetch_trakt_watching(generate_slug(title), "movies")
@@ -266,6 +96,7 @@ def format_movie_embed(movie):
         runtime = f"{details.get('runtime', 'N/A')} minutes"
         release_date = details.get("release_date", "N/A")
         trakt_link = f"https://trakt.tv/movies/{generate_slug(title)}"
+        trailer = f"https://www.youtube.com/results?search_query={quote(title)}+trailer"
         poster_url = f"https://image.tmdb.org/t/p/w200{details.get('poster_path', '')}"
 
         embed = discord.Embed(
@@ -276,7 +107,8 @@ def format_movie_embed(movie):
                         f"🕒 **Runtime**: {runtime}\n"
                         f"🎥 **Release Date**: {release_date}\n\n"
                         f"📜 **Tagline**: {tagline}\n"
-                        f"🔗 [More Info on Trakt]({trakt_link})",
+                        f"🔗 [Watch Trailer!]({trailer})\n"
+                        f"🔗 [Trakt]({trakt_link})",
             color=discord.Color.blue()
         )
         embed.set_thumbnail(url=poster_url)
@@ -285,15 +117,13 @@ def format_movie_embed(movie):
         print(f"Error creating movie embed: {e}")
         return None
 
-
 # Helper to format TV show embeds
 def format_tv_embed(show):
     try:
-        details = fetch_tmdb_show_details(show["id"])
+        details = tmdb.TV(show["id"]).info()
         title = details.get("name", "Unknown Title")
         rating = f"{details.get('vote_average', 0):.1f}/10 ({details.get('vote_count', 0)} votes)"
         watchers = fetch_trakt_watching(generate_slug(title), "shows")
-        tagline = details.get("tagline", "No tagline available.")
         genres = ", ".join([genre["name"] for genre in details.get("genres", [])[:2]])
         episode_length = f"{details.get('episode_run_time', ['N/A'])[0]} minutes"
         status = details.get("status", "N/A")
@@ -307,8 +137,7 @@ def format_tv_embed(show):
                         f"🎭 **Genres**: {genres}\n"
                         f"🕒 **Episode Length**: {episode_length}\n"
                         f"📅 **Status**: {status}\n\n"
-                        f"📜 **Tagline**: {tagline}\n"
-                        f"🔗 [More Info on Trakt]({trakt_link})",
+                        f"🔗 [Trakt]({trakt_link})",
             color=discord.Color.green()
         )
         embed.set_thumbnail(url=poster_url)
@@ -317,27 +146,22 @@ def format_tv_embed(show):
         print(f"Error creating TV embed: {e}")
         return None
 
-
 # Helper to format anime embeds
 def format_anime_embed(anime):
     try:
         title = anime["title"]["romaji"]
         score = anime.get("averageScore", "N/A")
-        watchers = fetch_trakt_watching(title.replace(" ", "-").lower(), "shows")
-        genres = ", ".join(anime.get("genres", [])[:2])
-        episodes = anime.get("episodes", "N/A")
-        status = "Airing" if anime.get("status", "").lower() == "releasing" else "Completed"
-        trakt_link = f"https://trakt.tv/search?query={quote(title)}"
+        popularity = anime.get("popularity", "N/A")
+        status = anime.get("status", "N/A").capitalize()
+        anilist_link = f"https://anilist.co/anime/{anime.get('id', '')}"
         poster_url = anime["coverImage"]["large"]
 
         embed = discord.Embed(
             title=title,
-            description=f"⭐ **{score}/100**\n"
-                        f"👀 **{watchers}** people currently watching\n\n"
-                        f"🎭 **Genres**: {genres}\n"
-                        f"📺 **Episodes**: {episodes}\n"
+            description=f"⭐ **Score**: {score}/100\n"
+                        f"👥 **Popularity**: {popularity}\n"
                         f"📅 **Status**: {status}\n\n"
-                        f"🔗 [More Info on Trakt]({trakt_link})",
+                        f"🔗 [AniList]({anilist_link})",
             color=discord.Color.orange()
         )
         embed.set_thumbnail(url=poster_url)
@@ -346,32 +170,80 @@ def format_anime_embed(anime):
         print(f"Error creating anime embed: {e}")
         return None
 
+# Generate slug for Trakt
+def generate_slug(title):
+    return title.lower().replace(" ", "-").replace(":", "").replace(",", "")
+
+# Fetch users currently watching from Trakt
+def fetch_trakt_watching(slug, media_type):
+    try:
+        url = f"https://api.trakt.tv/{media_type}/{slug}/watching"
+        response = requests.get(url, headers=trakt_headers)
+        if response.status_code == 200:
+            return len(response.json())  # Count of users watching
+        return 0
+    except Exception as e:
+        print(f"Error fetching Trakt watching data for {slug}: {e}")
+        return 0
+
+async def post_trending_content():
+    """Fetch and post trending content."""
+    if not CHANNEL_ID:
+        print("CHANNEL_ID is not set or invalid.")
+        return
+
+    channel = bot.get_channel(CHANNEL_ID)
+    if channel is None:
+        print(f"Channel with ID {CHANNEL_ID} not found!")
+        return
+
+    try:
+        # Fetch trending data
+        tmdb_movies = fetch_tmdb_trending_movies()
+        tmdb_shows = fetch_tmdb_trending_shows()
+        anilist_anime = fetch_anilist_current_season()
+
+        # Post movies
+        if tmdb_movies:
+            await channel.send("🎥 **Trending Movies**")
+            for movie in tmdb_movies:
+                embed = format_movie_embed(movie)
+                if embed:
+                    await channel.send(embed=embed)
+
+        # Post TV shows
+        if tmdb_shows:
+            await channel.send("📺 **Trending TV Shows**")
+            for show in tmdb_shows:
+                embed = format_tv_embed(show)
+                if embed:
+                    await channel.send(embed=embed)
+
+        # Post anime
+        if anilist_anime:
+            await channel.send("🍥 **Current Anime Season**")
+            for anime in anilist_anime:
+                embed = format_anime_embed(anime)
+                if embed:
+                    await channel.send(embed=embed)
+
+    except Exception as e:
+        print(f"Error posting trending content: {e}")
+
 # Slash command to post trending content
 @bot.tree.command(name="post_trending", description="Manually post trending content.")
 async def post_trending_command(interaction: discord.Interaction):
-    await interaction.response.defer()  # Acknowledge the interaction immediately
+    await interaction.response.defer()
     try:
         await post_trending_content()
         await interaction.followup.send("Trending content posted!")
     except Exception as e:
         await interaction.followup.send(f"Failed to post content: {e}")
 
-# Scheduled task for posting
-@tasks.loop(minutes=1)
-async def scheduled_post():
-    now = datetime.now().strftime("%H:%M")
-    if now == POST_TIME:
-        await post_trending_content()
-
 # Sync slash commands on bot startup
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user.name}")
-    try:
-        await bot.tree.sync()
-        print("Slash commands synced successfully!")
-    except Exception as e:
-        print(f"Error syncing slash commands: {e}")
-    scheduled_post.start()
+    await bot.tree.sync()
 
 bot.run(DISCORD_BOT_TOKEN)
