@@ -7,6 +7,7 @@ import requests
 from gql import gql, Client
 from gql.transport.requests import RequestsHTTPTransport
 from datetime import datetime
+from urllib.parse import quote
 
 # Load configuration from config.json or environment variables
 CONFIG_FILE = "config.json"
@@ -86,7 +87,8 @@ def fetch_anilist_current_season():
 def create_embed(item, media_type):
     if media_type == "movie":
         title = item.get("title")
-        trailer = f"https://www.youtube.com/results?search_query={title}+trailer" if title else "No trailer available"
+        encoded_title = quote(title) if title else "No trailer available"
+        trailer = f"https://www.youtube.com/results?search_query={encoded_title}+trailer"
         rating = item.get("vote_average", "N/A")
         votes = item.get("vote_count", "N/A")
         poster_url = f"https://image.tmdb.org/t/p/w200{item.get('poster_path', '')}"
@@ -95,7 +97,7 @@ def create_embed(item, media_type):
             description=f"⭐ **{rating}/10** ({votes} votes)\n[Trailer]({trailer})",
             color=discord.Color.blue()
         )
-        embed.set_thumbnail(url=poster_url)  # Use smaller image
+        embed.set_thumbnail(url=poster_url)  # Poster as thumbnail
         return embed
     elif media_type == "tv":
         title = item.get("name")
@@ -107,7 +109,7 @@ def create_embed(item, media_type):
             description=f"⭐ **{rating}/10** ({votes} votes)",
             color=discord.Color.green()
         )
-        embed.set_thumbnail(url=poster_url)  # Use smaller image
+        embed.set_thumbnail(url=poster_url)  # Poster as thumbnail
         return embed
     elif media_type == "anime":
         title = item["title"]["romaji"]
@@ -118,7 +120,7 @@ def create_embed(item, media_type):
             description=f"Score: **{score}/100**",
             color=discord.Color.orange()
         )
-        embed.set_thumbnail(url=poster_url)  # Use smaller image
+        embed.set_thumbnail(url=poster_url)  # Poster as thumbnail
         return embed
 
 # Post trending content in multiple embeds
