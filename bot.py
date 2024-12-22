@@ -124,21 +124,21 @@ def create_embed(item, media_type):
         title = details.get("title", "Unknown Title")
         release_date = details.get("release_date", "N/A")
         runtime = details.get("runtime", "N/A")
-        genres = ", ".join([genre["name"] for genre in details.get("genres", [])])
+        genres = ", ".join([genre["name"] for genre in details.get("genres", [])[:2]])
         tagline = details.get("tagline", "No tagline available.")
         slug = generate_slug(title)
+        watchers = fetch_trakt_watching(slug, "movies")
         trakt_link = f"{trakt_base_url}/movies/{slug}"
-        similar_titles = ", ".join([sim["title"] for sim in details.get("similar", {}).get("results", [])[:3]]) or "N/A"
         poster_url = f"https://image.tmdb.org/t/p/w200{details.get('poster_path', '')}"
 
         embed = discord.Embed(
             title=title,
-            description=f"⭐ **{details.get('vote_average', 'N/A')}/10** ({details.get('vote_count', 'N/A')} votes)\n"
+            description=f"⭐ **{details.get('vote_average', 0):.1f}/10** ({details.get('vote_count', 0)} votes)\n"
                         f"🎥 **Release Date**: {release_date}\n"
                         f"🕒 **Runtime**: {runtime} minutes\n"
                         f"🎭 **Genres**: {genres}\n"
+                        f"👀 **{watchers}** people currently watching\n"
                         f"📜 **Tagline**: {tagline}\n"
-                        f"🎞️ **Similar Titles**: {similar_titles}\n"
                         f"🔗 [More Info on Trakt]({trakt_link})",
             color=discord.Color.blue()
         )
@@ -149,25 +149,23 @@ def create_embed(item, media_type):
         # Fetch detailed information for the TV show
         details = fetch_tmdb_show_details(item["id"])
         title = details.get("name", "Unknown Title")
-        genres = ", ".join([genre["name"] for genre in details.get("genres", [])])
+        genres = ", ".join([genre["name"] for genre in details.get("genres", [])[:2]])
         episode_length = details.get("episode_run_time", ["N/A"])[0]
         status = details.get("status", "N/A")
         seasons = details.get("number_of_seasons", "N/A")
-        tagline = details.get("tagline", "No tagline available.")
         slug = generate_slug(title)
+        watchers = fetch_trakt_watching(slug, "shows")
         trakt_link = f"{trakt_base_url}/shows/{slug}"
-        similar_titles = ", ".join([sim["name"] for sim in details.get("similar", {}).get("results", [])[:3]]) or "N/A"
         poster_url = f"https://image.tmdb.org/t/p/w200{details.get('poster_path', '')}"
 
         embed = discord.Embed(
             title=title,
-            description=f"⭐ **{details.get('vote_average', 'N/A')}/10** ({details.get('vote_count', 'N/A')} votes)\n"
+            description=f"⭐ **{details.get('vote_average', 0):.1f}/10** ({details.get('vote_count', 0)} votes)\n"
                         f"🎭 **Genres**: {genres}\n"
                         f"🕒 **Episode Length**: {episode_length} minutes\n"
                         f"📅 **Status**: {status}\n"
                         f"📺 **Seasons**: {seasons}\n"
-                        f"📜 **Tagline**: {tagline}\n"
-                        f"🎞️ **Similar Titles**: {similar_titles}\n"
+                        f"👀 **{watchers}** people currently watching\n"
                         f"🔗 [More Info on Trakt]({trakt_link})",
             color=discord.Color.green()
         )
@@ -179,7 +177,7 @@ def create_embed(item, media_type):
         score = item.get("averageScore", "N/A")
         episodes = item.get("episodes", "N/A")
         status = "Airing" if item.get("status", "N/A").lower() == "releasing" else "Completed"
-        genres = ", ".join(item.get("genres", []))
+        genres = ", ".join(item.get("genres", [])[:2])
         popularity = item.get("popularity", "N/A")
         trakt_link = f"{trakt_base_url}/search?query={quote(title)}"
         poster_url = item["coverImage"]["large"]
@@ -197,10 +195,12 @@ def create_embed(item, media_type):
         embed.set_thumbnail(url=poster_url)
         return embed
 
+
 async def send_batched_embeds(channel, embeds, title):
     batch_size = 10
     for i in range(0, len(embeds), batch_size):
         await channel.send(f"**{title}**", embeds=embeds[i:i + batch_size])
+
 
 # Post trending content in multiple embeds
 async def post_trending_content():
