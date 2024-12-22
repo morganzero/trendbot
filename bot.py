@@ -70,6 +70,7 @@ def fetch_anilist_current_season():
                     }
                     description
                     averageScore
+                    popularity
                     coverImage {
                         large
                     }
@@ -102,48 +103,104 @@ def fetch_trakt_watching(slug, media_type):
 def generate_slug(title):
     return title.lower().replace(" ", "-").replace(":", "").replace(",", "")
 
-# Create an embed for an item
+def fetch_tmdb_movie_details(movie_id):
+    """Fetch detailed movie info including runtime, genres, and tagline."""
+    details = tmdb.Movies(movie_id)
+    return details.info()
+
+
+def fetch_tmdb_show_details(show_id):
+    """Fetch detailed TV show info including genres, episode runtime, and seasons."""
+    details = tmdb.TV(show_id)
+    return details.info()
+
+
 def create_embed(item, media_type):
+    trakt_base_url = "https://trakt.tv"
+
     if media_type == "movie":
-        title = item.get("title")
-        slug = generate_slug(title) if title else "unknown"
-        watching = fetch_trakt_watching(slug, "movies")
-        trailer = f"https://www.youtube.com/results?search_query={quote(title)}+trailer" if title else "No trailer available"
-        rating = item.get("vote_average", "N/A")
-        votes = item.get("vote_count", "N/A")
-        poster_url = f"https://image.tmdb.org/t/p/w200{item.get('poster_path', '')}"
+        # Fetch detailed information for the movie
+        details = fetch_tmdb_movie_details(item["id"])
+        title = details.get("title", "Unknown Title")
+        release_date = details.get("release_date", "N/A")
+        runtime = details.get("runtime", "N/A")
+        genres = ", ".join([genre["name"] for genre in details.get("genres", [])])
+        tagline = details.get("tagline", "No tagline available.")
+        slug = generate_slug(title)
+        trakt_link = f"{trakt_base_url}/movies/{slug}"
+        similar_titles = ", ".join([sim["title"] for sim in details.get("similar", {}).get("results", [])[:3]]) or "N/A"
+        poster_url = f"https://image.tmdb.org/t/p/w200{details.get('poster_path', '')}"
+
         embed = discord.Embed(
             title=title,
-            description=f"⭐ **{rating}/10** ({votes} votes)\n👀 **{watching}** people currently watching\n[Trailer]({trailer})",
+            description=f"⭐ **{details.get('vote_average', 'N/A')}/10** ({details.get('vote_count', 'N/A')} votes)\n"
+                        f"🎥 **Release Date**: {release_date}\n"
+                        f"🕒 **Runtime**: {runtime} minutes\n"
+                        f"🎭 **Genres**: {genres}\n"
+                        f"📜 **Tagline**: {tagline}\n"
+                        f"🎞️ **Similar Titles**: {similar_titles}\n"
+                        f"🔗 [More Info on Trakt]({trakt_link})",
             color=discord.Color.blue()
         )
-        embed.set_thumbnail(url=poster_url)  # Smaller image on the left
+        embed.set_thumbnail(url=poster_url)
         return embed
+
     elif media_type == "tv":
-        title = item.get("name")
-        slug = generate_slug(title) if title else "unknown"
-        watching = fetch_trakt_watching(slug, "shows")
-        rating = item.get("vote_average", "N/A")
-        votes = item.get("vote_count", "N/A")
-        poster_url = f"https://image.tmdb.org/t/p/w200{item.get('poster_path', '')}"
+        # Fetch detailed information for the TV show
+        details = fetch_tmdb_show_details(item["id"])
+        title = details.get("name", "Unknown Title")
+        genres = ", ".join([genre["name"] for genre in details.get("genres", [])])
+        episode_length = details.get("episode_run_time", ["N/A"])[0]
+        status = details.get("status", "N/A")
+        seasons = details.get("number_of_seasons", "N/A")
+        tagline = details.get("tagline", "No tagline available.")
+        slug = generate_slug(title)
+        trakt_link = f"{trakt_base_url}/shows/{slug}"
+        similar_titles = ", ".join([sim["name"] for sim in details.get("similar", {}).get("results", [])[:3]]) or "N/A"
+        poster_url = f"https://image.tmdb.org/t/p/w200{details.get('poster_path', '')}"
+
         embed = discord.Embed(
             title=title,
-            description=f"⭐ **{rating}/10** ({votes} votes)\n👀 **{watching}** people currently watching",
+            description=f"⭐ **{details.get('vote_average', 'N/A')}/10** ({details.get('vote_count', 'N/A')} votes)\n"
+                        f"🎭 **Genres**: {genres}\n"
+                        f"🕒 **Episode Length**: {episode_length} minutes\n"
+                        f"📅 **Status**: {status}\n"
+                        f"📺 **Seasons**: {seasons}\n"
+                        f"📜 **Tagline**: {tagline}\n"
+                        f"🎞️ **Similar Titles**: {similar_titles}\n"
+                        f"🔗 [More Info on Trakt]({trakt_link})",
             color=discord.Color.green()
         )
-        embed.set_thumbnail(url=poster_url)  # Smaller image on the left
+        embed.set_thumbnail(url=poster_url)
         return embed
+
     elif media_type == "anime":
         title = item["title"]["romaji"]
         score = item.get("averageScore", "N/A")
+        episodes = item.get("episodes", "N/A")
+        status = "Airing" if item.get("status", "N/A").lower() == "releasing" else "Completed"
+        genres = ", ".join(item.get("genres", []))
+        popularity = item.get("popularity", "N/A")
+        trakt_link = f"{trakt_base_url}/search?query={quote(title)}"
         poster_url = item["coverImage"]["large"]
+
         embed = discord.Embed(
             title=title,
-            description=f"Score: **{score}/100**",
+            description=f"⭐ **Score**: {score}/100\n"
+                        f"📺 **Episodes**: {episodes}\n"
+                        f"📅 **Status**: {status}\n"
+                        f"🎭 **Genres**: {genres}\n"
+                        f"👥 **Popularity**: {popularity}\n"
+                        f"🔗 [More Info on Trakt]({trakt_link})",
             color=discord.Color.orange()
         )
-        embed.set_thumbnail(url=poster_url)  # Smaller image on the left
+        embed.set_thumbnail(url=poster_url)
         return embed
+
+async def send_batched_embeds(channel, embeds, title):
+    batch_size = 10
+    for i in range(0, len(embeds), batch_size):
+        await channel.send(f"**{title}**", embeds=embeds[i:i + batch_size])
 
 # Post trending content in multiple embeds
 async def post_trending_content():
@@ -161,17 +218,17 @@ async def post_trending_content():
         tmdb_shows = fetch_tmdb_trending_shows()
         anilist_anime = fetch_anilist_current_season()
 
-        # Post movies
+        # Movies
         movie_embeds = [create_embed(movie, "movie") for movie in tmdb_movies]
-        await channel.send("🎥 **Trending Movies**", embeds=movie_embeds)
+        await send_batched_embeds(channel, movie_embeds, "🎥 Trending Movies")
 
-        # Post TV shows
+        # TV Shows
         tv_embeds = [create_embed(show, "tv") for show in tmdb_shows]
-        await channel.send("📺 **Trending TV Shows**", embeds=tv_embeds)
+        await send_batched_embeds(channel, tv_embeds, "📺 Trending TV Shows")
 
-        # Post anime
+        # Anime
         anime_embeds = [create_embed(anime, "anime") for anime in anilist_anime]
-        await channel.send("🍥 **Current Anime Season**", embeds=anime_embeds)
+        await send_batched_embeds(channel, anime_embeds, "🍥 Current Anime Season")
 
     except Exception as e:
         print(f"Error posting trending content: {e}")
