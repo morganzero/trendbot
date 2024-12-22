@@ -83,33 +83,51 @@ def fetch_anilist_current_season():
         print(f"Error fetching AniList data: {e}")
         return []
 
+# Fetch users currently watching from Trakt
+def fetch_trakt_watching(slug, media_type):
+    try:
+        url = f"https://api.trakt.tv/{media_type}/{slug}/watching"
+        response = requests.get(url, headers=trakt_headers)
+        if response.status_code == 200:
+            watching_data = response.json()
+            return len(watching_data)  # Count of users watching
+        else:
+            print(f"Failed to fetch Trakt watching data for {slug}: {response.status_code}")
+            return 0
+    except Exception as e:
+        print(f"Error fetching Trakt watching data for {slug}: {e}")
+        return 0
+
 # Create an embed for an item
 def create_embed(item, media_type):
     if media_type == "movie":
         title = item.get("title")
-        encoded_title = quote(title) if title else "No trailer available"
-        trailer = f"https://www.youtube.com/results?search_query={encoded_title}+trailer"
+        slug = item.get("id")  # Trakt ID or generate slug from title
+        watching = fetch_trakt_watching(slug, "movies")
+        trailer = f"https://www.youtube.com/results?search_query={quote(title)}+trailer" if title else "No trailer available"
         rating = item.get("vote_average", "N/A")
         votes = item.get("vote_count", "N/A")
-        poster_url = f"https://image.tmdb.org/t/p/w200{item.get('poster_path', '')}"
+        poster_url = f"https://image.tmdb.org/t/p/w500{item.get('poster_path', '')}"
         embed = discord.Embed(
             title=title,
-            description=f"⭐ **{rating}/10** ({votes} votes)\n[Trailer]({trailer})",
+            description=f"⭐ **{rating}/10** ({votes} votes)\n👀 **{watching}** people currently watching\n[Trailer]({trailer})",
             color=discord.Color.blue()
         )
-        embed.set_thumbnail(url=poster_url)  # Poster as thumbnail
+        embed.set_image(url=poster_url)  # Poster as full image (left side)
         return embed
     elif media_type == "tv":
         title = item.get("name")
+        slug = item.get("id")  # Trakt ID or generate slug from title
+        watching = fetch_trakt_watching(slug, "shows")
         rating = item.get("vote_average", "N/A")
         votes = item.get("vote_count", "N/A")
-        poster_url = f"https://image.tmdb.org/t/p/w200{item.get('poster_path', '')}"
+        poster_url = f"https://image.tmdb.org/t/p/w500{item.get('poster_path', '')}"
         embed = discord.Embed(
             title=title,
-            description=f"⭐ **{rating}/10** ({votes} votes)",
+            description=f"⭐ **{rating}/10** ({votes} votes)\n👀 **{watching}** people currently watching",
             color=discord.Color.green()
         )
-        embed.set_thumbnail(url=poster_url)  # Poster as thumbnail
+        embed.set_image(url=poster_url)  # Poster as full image (left side)
         return embed
     elif media_type == "anime":
         title = item["title"]["romaji"]
@@ -120,7 +138,7 @@ def create_embed(item, media_type):
             description=f"Score: **{score}/100**",
             color=discord.Color.orange()
         )
-        embed.set_thumbnail(url=poster_url)  # Poster as thumbnail
+        embed.set_image(url=poster_url)  # Poster as full image (left side)
         return embed
 
 # Post trending content in multiple embeds
@@ -140,24 +158,15 @@ async def post_trending_content():
         anilist_anime = fetch_anilist_current_season()
 
         # Post movies
-        movie_embeds = []
-        for movie in tmdb_movies:
-            embed = create_embed(movie, "movie")
-            movie_embeds.append(embed)
+        movie_embeds = [create_embed(movie, "movie") for movie in tmdb_movies]
         await channel.send("🎥 **Trending Movies**", embeds=movie_embeds)
 
         # Post TV shows
-        tv_embeds = []
-        for show in tmdb_shows:
-            embed = create_embed(show, "tv")
-            tv_embeds.append(embed)
+        tv_embeds = [create_embed(show, "tv") for show in tmdb_shows]
         await channel.send("📺 **Trending TV Shows**", embeds=tv_embeds)
 
         # Post anime
-        anime_embeds = []
-        for anime in anilist_anime:
-            embed = create_embed(anime, "anime")
-            anime_embeds.append(embed)
+        anime_embeds = [create_embed(anime, "anime") for anime in anilist_anime]
         await channel.send("🍥 **Current Anime Season**", embeds=anime_embeds)
 
     except Exception as e:
