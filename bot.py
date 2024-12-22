@@ -102,32 +102,32 @@ def fetch_trakt_watching(slug, media_type):
 def create_embed(item, media_type):
     if media_type == "movie":
         title = item.get("title")
-        slug = item.get("id")  # Trakt ID or generate slug from title
+        slug = title.lower().replace(" ", "-") if title else "unknown"
         watching = fetch_trakt_watching(slug, "movies")
         trailer = f"https://www.youtube.com/results?search_query={quote(title)}+trailer" if title else "No trailer available"
         rating = item.get("vote_average", "N/A")
         votes = item.get("vote_count", "N/A")
-        poster_url = f"https://image.tmdb.org/t/p/w500{item.get('poster_path', '')}"
+        poster_url = f"https://image.tmdb.org/t/p/w200{item.get('poster_path', '')}"
         embed = discord.Embed(
             title=title,
             description=f"⭐ **{rating}/10** ({votes} votes)\n👀 **{watching}** people currently watching\n[Trailer]({trailer})",
             color=discord.Color.blue()
         )
-        embed.set_image(url=poster_url)  # Poster as full image (left side)
+        embed.set_thumbnail(url=poster_url)  # Smaller image on the left
         return embed
     elif media_type == "tv":
         title = item.get("name")
-        slug = item.get("id")  # Trakt ID or generate slug from title
+        slug = title.lower().replace(" ", "-") if title else "unknown"
         watching = fetch_trakt_watching(slug, "shows")
         rating = item.get("vote_average", "N/A")
         votes = item.get("vote_count", "N/A")
-        poster_url = f"https://image.tmdb.org/t/p/w500{item.get('poster_path', '')}"
+        poster_url = f"https://image.tmdb.org/t/p/w200{item.get('poster_path', '')}"
         embed = discord.Embed(
             title=title,
             description=f"⭐ **{rating}/10** ({votes} votes)\n👀 **{watching}** people currently watching",
             color=discord.Color.green()
         )
-        embed.set_image(url=poster_url)  # Poster as full image (left side)
+        embed.set_thumbnail(url=poster_url)  # Smaller image on the left
         return embed
     elif media_type == "anime":
         title = item["title"]["romaji"]
@@ -138,7 +138,7 @@ def create_embed(item, media_type):
             description=f"Score: **{score}/100**",
             color=discord.Color.orange()
         )
-        embed.set_image(url=poster_url)  # Poster as full image (left side)
+        embed.set_thumbnail(url=poster_url)  # Smaller image on the left
         return embed
 
 # Post trending content in multiple embeds
