@@ -113,11 +113,11 @@ def create_embed(item, media_type):
         votes = item.get("vote_count", "N/A")
         poster_url = f"https://image.tmdb.org/t/p/w200{item.get('poster_path', '')}"
         embed = discord.Embed(
-            url=poster_url,
             title=title,
             description=f"⭐ **{rating}/10** ({votes} votes)\n👀 **{watching}** people currently watching\n[Trailer]({trailer})",
             color=discord.Color.blue()
         )
+        embed.set_thumbnail(url=poster_url)  # Smaller image on the left
         return embed
     elif media_type == "tv":
         title = item.get("name")
@@ -127,22 +127,22 @@ def create_embed(item, media_type):
         votes = item.get("vote_count", "N/A")
         poster_url = f"https://image.tmdb.org/t/p/w200{item.get('poster_path', '')}"
         embed = discord.Embed(
-            url=poster_url,
             title=title,
             description=f"⭐ **{rating}/10** ({votes} votes)\n👀 **{watching}** people currently watching",
             color=discord.Color.green()
         )
+        embed.set_thumbnail(url=poster_url)  # Smaller image on the left
         return embed
     elif media_type == "anime":
         title = item["title"]["romaji"]
         score = item.get("averageScore", "N/A")
         poster_url = item["coverImage"]["large"]
         embed = discord.Embed(
-            url=poster_url,
             title=title,
             description=f"Score: **{score}/100**",
-            color=discord.Color.pink()
+            color=discord.Color.orange()
         )
+        embed.set_thumbnail(url=poster_url)  # Smaller image on the left
         return embed
 
 # Post trending content in multiple embeds
