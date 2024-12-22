@@ -113,7 +113,7 @@ def create_embed(item, media_type):
         votes = item.get("vote_count", "N/A")
         poster_url = f"https://image.tmdb.org/t/p/w200{item.get('poster_path', '')}"
         embed = discord.Embed(
-            url=poster_url
+            url=poster_url,
             title=title,
             description=f"⭐ **{rating}/10** ({votes} votes)\n👀 **{watching}** people currently watching\n[Trailer]({trailer})",
             color=discord.Color.blue()
@@ -127,7 +127,7 @@ def create_embed(item, media_type):
         votes = item.get("vote_count", "N/A")
         poster_url = f"https://image.tmdb.org/t/p/w200{item.get('poster_path', '')}"
         embed = discord.Embed(
-            url=poster_url
+            url=poster_url,
             title=title,
             description=f"⭐ **{rating}/10** ({votes} votes)\n👀 **{watching}** people currently watching",
             color=discord.Color.green()
@@ -138,7 +138,7 @@ def create_embed(item, media_type):
         score = item.get("averageScore", "N/A")
         poster_url = item["coverImage"]["large"]
         embed = discord.Embed(
-            url=poster_url
+            url=poster_url,
             title=title,
             description=f"Score: **{score}/100**",
             color=discord.Color.pink()
