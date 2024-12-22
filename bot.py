@@ -89,25 +89,25 @@ def create_embed(item, media_type):
         trailer = f"https://www.youtube.com/results?search_query={title}+trailer" if title else "No trailer available"
         rating = item.get("vote_average", "N/A")
         votes = item.get("vote_count", "N/A")
-        poster_url = f"https://image.tmdb.org/t/p/w500{item.get('poster_path', '')}"
+        poster_url = f"https://image.tmdb.org/t/p/w200{item.get('poster_path', '')}"
         embed = discord.Embed(
             title=title,
             description=f"⭐ **{rating}/10** ({votes} votes)\n[Trailer]({trailer})",
             color=discord.Color.blue()
         )
-        embed.set_image(url=poster_url)
+        embed.set_thumbnail(url=poster_url)  # Use smaller image
         return embed
     elif media_type == "tv":
         title = item.get("name")
         rating = item.get("vote_average", "N/A")
         votes = item.get("vote_count", "N/A")
-        poster_url = f"https://image.tmdb.org/t/p/w500{item.get('poster_path', '')}"
+        poster_url = f"https://image.tmdb.org/t/p/w200{item.get('poster_path', '')}"
         embed = discord.Embed(
             title=title,
             description=f"⭐ **{rating}/10** ({votes} votes)",
             color=discord.Color.green()
         )
-        embed.set_image(url=poster_url)
+        embed.set_thumbnail(url=poster_url)  # Use smaller image
         return embed
     elif media_type == "anime":
         title = item["title"]["romaji"]
@@ -118,7 +118,7 @@ def create_embed(item, media_type):
             description=f"Score: **{score}/100**",
             color=discord.Color.orange()
         )
-        embed.set_image(url=poster_url)
+        embed.set_thumbnail(url=poster_url)  # Use smaller image
         return embed
 
 # Post trending content in multiple embeds
